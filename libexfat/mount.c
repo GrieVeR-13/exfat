@@ -180,25 +180,9 @@ static void exfat_free(struct exfat* ef)
 	ef->sb = NULL;
 }
 
-int exfat_mount(struct exfat* ef, const char* spec, const char* options)
+int exfat_mount_opened(struct exfat* ef, enum exfat_mode mode)
 {
 	int rc;
-	enum exfat_mode mode;
-
-	exfat_tzset();
-	memset(ef, 0, sizeof(struct exfat));
-
-	parse_options(ef, options);
-
-	if (exfat_match_option(options, "ro"))
-		mode = EXFAT_MODE_RO;
-	else if (exfat_match_option(options, "ro_fallback"))
-		mode = EXFAT_MODE_ANY;
-	else
-		mode = EXFAT_MODE_RW;
-	ef->dev = exfat_open(spec, mode);
-	if (ef->dev == NULL)
-		return -EIO;
 	if (exfat_get_mode(ef->dev) == EXFAT_MODE_RO)
 	{
 		if (mode == EXFAT_MODE_ANY)
@@ -338,6 +322,30 @@ error:
 	exfat_reset_cache(ef);
 	exfat_free(ef);
 	return -EIO;
+}
+
+int exfat_mount(struct exfat* ef, const char* spec, const char* options)
+{
+	int rc;
+	enum exfat_mode mode;
+
+	exfat_tzset();
+	memset(ef, 0, sizeof(struct exfat));
+
+	parse_options(ef, options);
+
+	if (exfat_match_option(options, "ro"))
+		mode = EXFAT_MODE_RO;
+	else if (exfat_match_option(options, "ro_fallback"))
+		mode = EXFAT_MODE_ANY;
+	else
+		mode = EXFAT_MODE_RW;
+	ef->dev = exfat_open(spec, mode);
+	if (ef->dev == NULL)
+		return -EIO;
+
+	rc = exfat_mount_opened(ef, mode);
+	return rc;
 }
 
 static void finalize_super_block(struct exfat* ef)

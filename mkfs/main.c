@@ -154,7 +154,7 @@ static uint32_t setup_volume_serial(uint32_t user_defined)
 	return (now.tv_sec << 20) | now.tv_usec;
 }
 
-static int setup(struct exfat_dev* dev, int sector_bits, int spc_bits,
+int setup(struct exfat_dev* dev, int sector_bits, int spc_bits,
 		const char* volume_label, uint32_t volume_serial,
 		uint64_t first_sector)
 {
@@ -176,7 +176,7 @@ static int setup(struct exfat_dev* dev, int sector_bits, int spc_bits,
 	return mkfs(dev, param.volume_size);
 }
 
-static int logarithm2(int n)
+int logarithm2(int n)
 {
 	size_t i;
 

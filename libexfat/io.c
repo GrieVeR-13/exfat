@@ -43,16 +43,10 @@
 #include <ublio.h>
 #endif
 
-struct exfat_dev
-{
-	int fd;
-	enum exfat_mode mode;
-	off_t size; /* in bytes */
-#ifdef USE_UBLIO
-	off_t pos;
-	ublio_filehandle_t ufh;
+#ifdef USE_JNI
+#include <jni.h>
+#include "../jni/raio.h"
 #endif
-};
 
 static bool is_open(int fd)
 {
@@ -270,7 +264,10 @@ struct exfat_dev* exfat_open(const char* spec, enum exfat_mode mode)
 int exfat_close(struct exfat_dev* dev)
 {
 	int rc = 0;
-
+#ifdef USE_JNI
+	JNIEnv  *env = dev->env;
+	(*env)->DeleteGlobalRef(env, dev->raio);
+#else
 #ifdef USE_UBLIO
 	if (ublio_close(dev->ufh) != 0)
 	{
@@ -283,6 +280,7 @@ int exfat_close(struct exfat_dev* dev)
 		exfat_error("failed to close device: %s", strerror(errno));
 		rc = -EIO;
 	}
+#endif
 	free(dev);
 	return rc;
 }
@@ -291,6 +289,13 @@ int exfat_fsync(struct exfat_dev* dev)
 {
 	int rc = 0;
 
+#ifdef USE_JNI
+	if (raio_flush(dev->env, dev->raio) != 0)
+	{
+		exfat_error("fsync failed: %s", strerror(errno));
+		rc = -EIO;
+	}
+#else
 #ifdef USE_UBLIO
 	if (ublio_fsync(dev->ufh) != 0)
 	{
@@ -303,6 +308,7 @@ int exfat_fsync(struct exfat_dev* dev)
 		exfat_error("fsync failed: %s", strerror(errno));
 		rc = -EIO;
 	}
+#endif
 	return rc;
 }
 
@@ -318,7 +324,36 @@ off_t exfat_get_size(const struct exfat_dev* dev)
 
 off_t exfat_seek(struct exfat_dev* dev, off_t offset, int whence)
 {
-#ifdef USE_UBLIO
+#ifdef USE_JNI
+	int rc;
+	off64_t cur;
+	switch (whence)
+	{
+		case SEEK_SET:
+			rc = raio_seek(dev->env, dev->raio, offset);
+			if(rc)
+				return (off64_t) -1;
+			break;
+		case SEEK_CUR:
+			cur = raio_get_pos(dev->env, dev->raio);
+			if( cur == (off64_t)-1)
+				return cur;
+			rc = raio_seek(dev->env, dev->raio, offset + cur);
+			if(rc)
+				return (off64_t) -1;
+			break;
+		case SEEK_END:
+			cur = raio_get_size(dev->env, dev->raio);
+			if( cur == (off64_t)-1)
+				return cur;
+			rc = raio_seek(dev->env, dev->raio, offset + cur);
+			if(rc)
+				return (off64_t) -1;
+			break;
+	}
+	return raio_get_pos(dev->env, dev->raio);
+
+#elif USE_UBLIO
 	/* XXX SEEK_CUR will be handled incorrectly */
 	return dev->pos = lseek(dev->fd, offset, whence);
 #else
@@ -328,6 +363,9 @@ off_t exfat_seek(struct exfat_dev* dev, off_t offset, int whence)
 
 ssize_t exfat_read(struct exfat_dev* dev, void* buffer, size_t size)
 {
+#ifdef USE_JNI
+	return raio_read(dev->env, dev->raio, buffer, size);
+#else
 #ifdef USE_UBLIO
 	ssize_t result = ublio_pread(dev->ufh, buffer, size, dev->pos);
 	if (result >= 0)
@@ -336,10 +374,14 @@ ssize_t exfat_read(struct exfat_dev* dev, void* buffer, size_t size)
 #else
 	return read(dev->fd, buffer, size);
 #endif
+#endif
 }
 
 ssize_t exfat_write(struct exfat_dev* dev, const void* buffer, size_t size)
 {
+#ifdef USE_JNI
+	return raio_write(dev->env, dev->raio, buffer, size);
+#else
 #ifdef USE_UBLIO
 	ssize_t result = ublio_pwrite(dev->ufh, buffer, size, dev->pos);
 	if (result >= 0)
@@ -348,25 +390,34 @@ ssize_t exfat_write(struct exfat_dev* dev, const void* buffer, size_t size)
 #else
 	return write(dev->fd, buffer, size);
 #endif
+#endif
 }
 
 ssize_t exfat_pread(struct exfat_dev* dev, void* buffer, size_t size,
 		off_t offset)
 {
+#ifdef USE_JNI
+	return raio_pread(dev->env, dev->raio, buffer, size, offset);
+#else
 #ifdef USE_UBLIO
 	return ublio_pread(dev->ufh, buffer, size, offset);
 #else
 	return pread(dev->fd, buffer, size, offset);
+#endif
 #endif
 }
 
 ssize_t exfat_pwrite(struct exfat_dev* dev, const void* buffer, size_t size,
 		off_t offset)
 {
+#ifdef USE_JNI
+	return raio_pwrite(dev->env, dev->raio, buffer, size, offset);
+#else
 #ifdef USE_UBLIO
 	return ublio_pwrite(dev->ufh, buffer, size, offset);
 #else
 	return pwrite(dev->fd, buffer, size, offset);
+#endif
 #endif
 }
 

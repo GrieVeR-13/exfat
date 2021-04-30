@@ -101,7 +101,25 @@ enum exfat_mode
 	EXFAT_MODE_ANY,
 };
 
-struct exfat_dev;
+#ifdef USE_JNI
+#include <jni.h>
+#endif
+
+struct exfat_dev
+{
+	int fd;
+	enum exfat_mode mode;
+	off_t size; /* in bytes */
+#ifdef USE_UBLIO
+	off_t pos;
+	ublio_filehandle_t ufh;
+#endif
+#ifdef USE_JNI
+	jobject raio;
+	JNIEnv  *env;
+#endif
+};
+
 
 struct exfat
 {
