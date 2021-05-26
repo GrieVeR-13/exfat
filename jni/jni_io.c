@@ -1,6 +1,6 @@
 #include "jni_io.h"
 #include <string.h>
-#include "raio.h"
+#include "cutil/raio.h"
 #include <exfat.h>
 #include <asm/errno.h>
 #include "inttypes.h"

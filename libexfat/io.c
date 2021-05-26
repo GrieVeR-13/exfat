@@ -45,7 +45,7 @@
 
 #ifdef USE_JNI
 #include <jni.h>
-#include "../jni/raio.h"
+#include "cutil/raio.h"
 #endif
 
 static bool is_open(int fd)
